@@ -1,0 +1,370 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  CUSTOMER
+}
+
+enum UserStatus {
+  ACTIVE
+  BLOCKED
+}
+
+enum KycStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum KycDocumentType {
+  PASSPORT
+  NATIONAL_ID
+  DRIVERS_LICENSE
+}
+
+enum InvestmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum TradingBotSubscriptionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  CANCELLED
+}
+
+enum WithdrawalMethod {
+  BANK
+  CRYPTO
+}
+
+enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+enum TransferType {
+  INVESTMENT_TO_MAIN
+  CUSTOMER_TO_CUSTOMER
+}
+
+enum TransferStatus {
+  COMPLETED
+  FAILED
+}
+
+
+model User {
+  id            String     @id @default(cuid())
+  name          String?
+  firstName     String
+  lastName      String
+  email         String     @unique
+  password      String
+  role          Role       @default(CUSTOMER)
+  status        UserStatus @default(ACTIVE)
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+
+  accounts           Account[]
+  sessions           Session[]
+  investments Investment[]
+  withdrawals Withdrawal[]
+  tradingBotSubscriptions TradingBotSubscription[]
+  wallet             Wallet?
+  customerAllocation CustomerAllocation?
+  sentTransfers InternalTransfer[] @relation("TransferSender")
+  receivedTransfers InternalTransfer[] @relation("TransferRecipient")
+
+  adminWalletCredits WalletTransaction[] @relation("WalletTransactionAdmin")
+
+  kycApplication KycApplication?
+  kycReviews     KycApplication[] @relation("KycReviewer")
+
+  @@index([role])
+  @@index([status])
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+enum WalletTransactionType {
+  CREDIT
+  DEPOSIT
+  WITHDRAWAL
+  INVESTMENT_PROFIT
+}
+
+model Wallet {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  balance   Decimal  @default(0) @db.Decimal(20, 2)
+  currency  String   @default("USD")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions WalletTransaction[]
+
+  @@index([userId])
+}
+
+model WalletTransaction {
+  id          String                @id @default(cuid())
+  walletId    String
+  adminId     String?
+  amount      Decimal               @db.Decimal(20, 2)
+  type        WalletTransactionType
+  description String
+  reference   String                @unique @default(cuid())
+  createdAt   DateTime              @default(now())
+
+  wallet Wallet @relation(fields: [walletId], references: [id], onDelete: Restrict)
+  admin  User?  @relation("WalletTransactionAdmin", fields: [adminId], references: [id], onDelete: SetNull)
+
+  @@index([walletId, createdAt])
+  @@index([adminId])
+}
+
+
+model TradingBotSubscription {
+  id        String                       @id @default(cuid())
+  userId    String
+  planId    String
+  planName  String
+  amount    Decimal                      @db.Decimal(20, 2)
+  roi       String
+  duration  Int
+  status    TradingBotSubscriptionStatus @default(ACTIVE)
+  startedAt DateTime                     @default(now())
+  endsAt    DateTime
+  createdAt DateTime                     @default(now())
+  updatedAt DateTime                     @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+}
+
+model KycApplication {
+  id     String @id @default(cuid())
+  userId String @unique
+
+  status      KycStatus @default(NOT_STARTED)
+  currentStep Int       @default(1)
+
+  // STEP 1 - PERSONAL INFORMATION
+  firstName   String?
+  lastName    String?
+  dateOfBirth DateTime?
+  country     String?
+  state       String?
+  city        String?
+  address     String?
+  postalCode  String?
+  phone       String?
+
+  // STEP 2 - IDENTITY DOCUMENT
+  documentType    KycDocumentType?
+  documentNumber  String?
+  documentFrontId String?
+  documentBackId  String?
+  selfieId        String?
+
+  // ADMIN REVIEW
+  rejectionReason String?
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewedById    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user       User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("KycReviewer", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([reviewedById])
+}
+
+model CustomerAllocation {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  activeInvestmentAmount Decimal  @default(0) @db.Decimal(20, 2)
+  tradingBotAmount       Decimal  @default(0) @db.Decimal(20, 2)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+
+
+model Investment {
+  id          String           @id @default(cuid())
+  userId      String
+  planId      String
+  planName    String
+  amount      Decimal          @db.Decimal(20, 2)
+  duration    Int
+  dailyRate   String
+  roi         String
+  status      InvestmentStatus @default(ACTIVE)
+  startedAt   DateTime         @default(now())
+  endsAt      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+}
+
+model CryptoDepositAddress {
+  id           String   @id @default(cuid())
+  name         String?
+  network      String
+  address      String
+  qrCodeUrl    String?
+  instructions String?
+  enabled      Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([network])
+  @@index([enabled])
+}
+
+model BankPaymentSettings {
+  id                  String   @id @default(cuid())
+  enabled             Boolean  @default(true)
+
+  bankName            String
+  bankAccountName     String
+  bankAccountNumber   String
+
+  bankRoutingNumber   String?
+  bankSwiftCode       String?
+  bankIban            String?
+
+  depositInstructions String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Withdrawal {
+  id            String            @id @default(cuid())
+  userId        String
+  amount        Decimal           @db.Decimal(20, 2)
+  currency      String            @default("USD")
+  method        WithdrawalMethod
+  status        WithdrawalStatus  @default(PENDING)
+
+  // Bank details
+  bankName           String?
+  accountName        String?
+  accountNumber      String?
+  routingNumber      String?
+  swiftCode          String?
+  iban               String?
+
+  // Crypto details
+  cryptoNetwork      String?
+  cryptoAddress      String?
+
+  note              String?
+  rejectionReason   String?
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  processedAt       DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([userId, status])
+  @@index([createdAt])
+}
+
+model InternalTransfer {
+  id             String         @id @default(cuid())
+  senderId       String
+  recipientId    String?
+  type           TransferType
+  amount         Decimal        @db.Decimal(20, 2)
+  currency       String         @default("USD")
+  recipientEmail String?
+  description    String?
+  status         TransferStatus @default(COMPLETED)
+  reference      String         @unique @default(cuid())
+  createdAt      DateTime       @default(now())
+
+  sender    User  @relation("TransferSender", fields: [senderId], references: [id], onDelete: Restrict)
+  recipient User? @relation("TransferRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+
+  @@index([senderId, createdAt])
+  @@index([recipientId, createdAt])
+  @@index([type])
+  @@index([status])
+}
