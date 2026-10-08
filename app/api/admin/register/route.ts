@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@/app/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { timingSafeEqual } from "node:crypto";
@@ -19,20 +19,10 @@ function secretMatches(
   received: string,
   expected: string
 ): boolean {
-  const receivedBuffer = Buffer.from(
-    received,
-    "utf8"
-  );
+  const receivedBuffer = Buffer.from(received, "utf8");
+  const expectedBuffer = Buffer.from(expected, "utf8");
 
-  const expectedBuffer = Buffer.from(
-    expected,
-    "utf8"
-  );
-
-  if (
-    receivedBuffer.length !==
-    expectedBuffer.length
-  ) {
+  if (receivedBuffer.length !== expectedBuffer.length) {
     return false;
   }
 

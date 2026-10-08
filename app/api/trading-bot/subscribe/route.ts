@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@/app/generated/prisma/client";
+import { Prisma } from "@prisma/client";
 
+/**
+ * Trading bot subscription plans
+ */
 const TRADING_BOT_PLANS = {
   starter: {
     id: "starter",
@@ -224,9 +227,6 @@ export async function POST(request: Request) {
 
         // -----------------------------------------------------
         // Prevent duplicate active subscriptions
-        //
-        // Remove this block later if you want customers to be
-        // able to have multiple active bot subscriptions.
         // -----------------------------------------------------
 
         const existingSubscription =
@@ -255,10 +255,6 @@ export async function POST(request: Request) {
 
         // -----------------------------------------------------
         // Deduct wallet balance
-        //
-        // The balance condition is included again here so that
-        // two simultaneous subscription requests cannot both
-        // spend the same available balance.
         // -----------------------------------------------------
 
         const walletUpdate = await tx.wallet.updateMany({
@@ -308,7 +304,6 @@ export async function POST(request: Request) {
               startedAt,
               endsAt,
             },
-
             select: {
               id: true,
               planId: true,
@@ -353,10 +348,6 @@ export async function POST(request: Request) {
 
         // -----------------------------------------------------
         // Create wallet transaction
-        //
-        // Your current enum doesn't contain INVESTMENT, so we
-        // use WITHDRAWAL for the money leaving the available
-        // wallet balance.
         // -----------------------------------------------------
 
         await tx.walletTransaction.create({
@@ -378,7 +369,6 @@ export async function POST(request: Request) {
             where: {
               id: wallet.id,
             },
-
             select: {
               balance: true,
               currency: true,

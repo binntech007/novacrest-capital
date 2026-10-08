@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
+
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@/app/generated/prisma/client";
+
+export const runtime = "nodejs";
 
 const PLANS = {
   gold: {
@@ -62,9 +65,12 @@ export async function POST(request: Request) {
     if (!session?.user?.id) {
       return NextResponse.json(
         {
-          error: "You must be logged in to start an investment.",
+          error:
+            "You must be logged in to start an investment.",
         },
-        { status: 401 }
+        {
+          status: 401,
+        }
       );
     }
 
@@ -74,18 +80,48 @@ export async function POST(request: Request) {
     // 2. READ REQUEST BODY
     // ---------------------------------------------------------
 
-    const body = await request.json();
+    let body: unknown;
+
+    try {
+      body = await request.json();
+    } catch {
+      return NextResponse.json(
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    if (!body || typeof body !== "object") {
+      return NextResponse.json(
+        {
+          error: "Invalid request body.",
+        },
+        {
+          status: 400,
+        }
+      );
+    }
+
+    const requestBody = body as {
+      planId?: unknown;
+      amount?: unknown;
+      reason?: unknown;
+    };
 
     const planId =
-      typeof body.planId === "string"
-        ? body.planId.trim()
+      typeof requestBody.planId === "string"
+        ? requestBody.planId.trim()
         : "";
 
-    const amountValue = body.amount;
+    const amountValue = requestBody.amount;
 
     const reason =
-      typeof body.reason === "string"
-        ? body.reason.trim()
+      typeof requestBody.reason === "string"
+        ? requestBody.reason.trim()
         : "";
 
     // ---------------------------------------------------------
@@ -97,16 +133,21 @@ export async function POST(request: Request) {
         {
           error: "Investment plan is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     if (!(planId in PLANS)) {
       return NextResponse.json(
         {
-          error: "The selected investment plan is invalid.",
+          error:
+            "The selected investment plan is invalid.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -124,7 +165,9 @@ export async function POST(request: Request) {
           {
             error: "Invalid investment amount.",
           },
-          { status: 400 }
+          {
+            status: 400,
+          }
         );
       }
 
@@ -136,24 +179,30 @@ export async function POST(request: Request) {
         {
           error: "Investment amount is required.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
     /*
-     * Only allow:
+     * Only allow amounts such as:
+     *
      * 100
      * 1000
      * 1000.50
      * 9999999999999999.99
      */
+
     if (!/^\d{1,16}(\.\d{1,2})?$/.test(amountString)) {
       return NextResponse.json(
         {
           error:
             "Enter a valid amount with no more than two decimal places.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -166,7 +215,9 @@ export async function POST(request: Request) {
         {
           error: "Invalid investment amount.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -177,9 +228,12 @@ export async function POST(request: Request) {
     if (amount.lessThanOrEqualTo(0)) {
       return NextResponse.json(
         {
-          error: "Investment amount must be greater than zero.",
+          error:
+            "Investment amount must be greater than zero.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -195,7 +249,9 @@ export async function POST(request: Request) {
         {
           error: `The minimum amount for ${plan.name} is $${plan.min.toLocaleString()}.`,
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -204,7 +260,9 @@ export async function POST(request: Request) {
         {
           error: `The maximum amount for ${plan.name} is $${plan.max.toLocaleString()}.`,
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -215,9 +273,12 @@ export async function POST(request: Request) {
     if (reason.length > 200) {
       return NextResponse.json(
         {
-          error: "The note must be 200 characters or fewer.",
+          error:
+            "The note must be 200 characters or fewer.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -242,9 +303,12 @@ export async function POST(request: Request) {
     if (!user) {
       return NextResponse.json(
         {
-          error: "Customer account could not be found.",
+          error:
+            "Customer account could not be found.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
@@ -255,9 +319,12 @@ export async function POST(request: Request) {
     if (user.role !== "CUSTOMER") {
       return NextResponse.json(
         {
-          error: "Only customer accounts can start investments.",
+          error:
+            "Only customer accounts can start investments.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
@@ -271,7 +338,9 @@ export async function POST(request: Request) {
           error:
             "Your account is not active and cannot start an investment.",
         },
-        { status: 403 }
+        {
+          status: 403,
+        }
       );
     }
 
@@ -316,19 +385,20 @@ export async function POST(request: Request) {
         // multiple requests happen at nearly the same time.
         // -----------------------------------------------------
 
-        const walletUpdate = await tx.wallet.updateMany({
-          where: {
-            id: wallet.id,
-            balance: {
-              gte: amount,
+        const walletUpdate =
+          await tx.wallet.updateMany({
+            where: {
+              id: wallet.id,
+              balance: {
+                gte: amount,
+              },
             },
-          },
-          data: {
-            balance: {
-              decrement: amount,
+            data: {
+              balance: {
+                decrement: amount,
+              },
             },
-          },
-        });
+          });
 
         if (walletUpdate.count !== 1) {
           throw new Error("INSUFFICIENT_BALANCE");
@@ -350,32 +420,33 @@ export async function POST(request: Request) {
         // Create investment
         // -----------------------------------------------------
 
-        const investment = await tx.investment.create({
-          data: {
-            userId,
-            planId: plan.id,
-            planName: plan.name,
-            amount,
-            duration: plan.duration,
-            dailyRate: plan.dailyRate,
-            roi: plan.roi,
-            status: "ACTIVE",
-            startedAt,
-            endsAt,
-          },
-          select: {
-            id: true,
-            planId: true,
-            planName: true,
-            amount: true,
-            duration: true,
-            dailyRate: true,
-            roi: true,
-            status: true,
-            startedAt: true,
-            endsAt: true,
-          },
-        });
+        const investment =
+          await tx.investment.create({
+            data: {
+              userId,
+              planId: plan.id,
+              planName: plan.name,
+              amount,
+              duration: plan.duration,
+              dailyRate: plan.dailyRate,
+              roi: plan.roi,
+              status: "ACTIVE",
+              startedAt,
+              endsAt,
+            },
+            select: {
+              id: true,
+              planId: true,
+              planName: true,
+              amount: true,
+              duration: true,
+              dailyRate: true,
+              roi: true,
+              status: true,
+              startedAt: true,
+              endsAt: true,
+            },
+          });
 
         // -----------------------------------------------------
         // Increase active investment allocation
@@ -418,15 +489,16 @@ export async function POST(request: Request) {
         // Get updated wallet
         // -----------------------------------------------------
 
-        const updatedWallet = await tx.wallet.findUnique({
-          where: {
-            id: wallet.id,
-          },
-          select: {
-            balance: true,
-            currency: true,
-          },
-        });
+        const updatedWallet =
+          await tx.wallet.findUnique({
+            where: {
+              id: wallet.id,
+            },
+            select: {
+              balance: true,
+              currency: true,
+            },
+          });
 
         // -----------------------------------------------------
         // Get updated allocation
@@ -465,7 +537,8 @@ export async function POST(request: Request) {
           id: result.investment.id,
           planId: result.investment.planId,
           planName: result.investment.planName,
-          amount: result.investment.amount.toString(),
+          amount:
+            result.investment.amount.toString(),
           duration: result.investment.duration,
           dailyRate: result.investment.dailyRate,
           roi: result.investment.roi,
@@ -476,8 +549,10 @@ export async function POST(request: Request) {
 
         wallet: result.wallet
           ? {
-              balance: result.wallet.balance.toString(),
-              currency: result.wallet.currency,
+              balance:
+                result.wallet.balance.toString(),
+              currency:
+                result.wallet.currency,
             }
           : null,
 
@@ -491,7 +566,9 @@ export async function POST(request: Request) {
             }
           : null,
       },
-      { status: 201 }
+      {
+        status: 201,
+      }
     );
   } catch (error) {
     // ---------------------------------------------------------
@@ -507,7 +584,9 @@ export async function POST(request: Request) {
           error:
             "Your wallet could not be found. Please contact support.",
         },
-        { status: 404 }
+        {
+          status: 404,
+        }
       );
     }
 
@@ -520,7 +599,9 @@ export async function POST(request: Request) {
           error:
             "Insufficient available wallet balance for this investment.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
@@ -528,14 +609,19 @@ export async function POST(request: Request) {
     // DATABASE / UNKNOWN ERROR
     // ---------------------------------------------------------
 
-    console.error("START INVESTMENT ERROR:", error);
+    console.error(
+      "START INVESTMENT ERROR:",
+      error
+    );
 
     return NextResponse.json(
       {
         error:
           "Unable to start the investment right now. Please try again.",
       },
-      { status: 500 }
+      {
+        status: 500,
+      }
     );
   }
 }
