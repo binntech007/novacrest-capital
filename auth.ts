@@ -1,4 +1,3 @@
-
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -7,7 +6,12 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
 
-export const { handlers, auth, signIn, signOut } = NextAuth({
+export const {
+  handlers,
+  auth,
+  signIn,
+  signOut,
+} = NextAuth({
   ...authConfig,
 
   adapter: PrismaAdapter(prisma),
@@ -28,28 +32,43 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       },
 
       async authorize(credentials) {
-        const email = String(credentials?.email ?? "")
+        const email = String(
+          credentials?.email ?? ""
+        )
           .trim()
           .toLowerCase();
 
-        const password = String(credentials?.password ?? "");
+        const password = String(
+          credentials?.password ?? ""
+        );
 
         if (!email || !password) {
           return null;
         }
 
         const user = await prisma.user.findUnique({
-          where: { email },
+          where: {
+            email,
+          },
         });
 
-        if (!user || user.status !== "ACTIVE") {
+        if (!user) {
           return null;
         }
 
-        const passwordMatches = await bcrypt.compare(
-          password,
-          user.password
-        );
+        if (user.status !== "ACTIVE") {
+          return null;
+        }
+
+        if (!user.password) {
+          return null;
+        }
+
+        const passwordMatches =
+          await bcrypt.compare(
+            password,
+            user.password
+          );
 
         if (!passwordMatches) {
           return null;
@@ -57,7 +76,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         return {
           id: user.id,
-          name: user.name ?? `${user.firstName} ${user.lastName}`,
+          name:
+            user.name ??
+            `${user.firstName} ${user.lastName}`,
           email: user.email,
           role: user.role,
           status: user.status,
@@ -81,11 +102,21 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = String(token.id ?? token.sub ?? "");
+        session.user.id = String(
+          token.id ??
+            token.sub ??
+            ""
+        );
+
         session.user.role =
-          token.role as "ADMIN" | "CUSTOMER";
+          token.role as
+            | "ADMIN"
+            | "CUSTOMER";
+
         session.user.status =
-          token.status as "ACTIVE" | "BLOCKED";
+          token.status as
+            | "ACTIVE"
+            | "BLOCKED";
       }
 
       return session;

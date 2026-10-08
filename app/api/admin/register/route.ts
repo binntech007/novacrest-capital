@@ -1,4 +1,3 @@
-
 import { NextResponse } from "next/server";
 import { Prisma } from "@/app/generated/prisma/client";
 import bcrypt from "bcryptjs";
@@ -16,32 +15,68 @@ const registrationSchema = z.object({
   password: z.string().min(12).max(128),
 });
 
-function secretMatches(received: string, expected: string) {
-  const receivedBuffer = Buffer.from(received, "utf8");
-  const expectedBuffer = Buffer.from(expected, "utf8");
+function secretMatches(
+  received: string,
+  expected: string
+): boolean {
+  const receivedBuffer = Buffer.from(
+    received,
+    "utf8"
+  );
 
-  if (receivedBuffer.length !== expectedBuffer.length) {
+  const expectedBuffer = Buffer.from(
+    expected,
+    "utf8"
+  );
+
+  if (
+    receivedBuffer.length !==
+    expectedBuffer.length
+  ) {
     return false;
   }
 
-  return timingSafeEqual(receivedBuffer, expectedBuffer);
+  return timingSafeEqual(
+    receivedBuffer,
+    expectedBuffer
+  );
 }
 
 export async function POST(request: Request) {
   try {
+    /*
+     * ------------------------------------------------------------
+     * Check admin registration secret
+     * ------------------------------------------------------------
+     */
+
     const authorizationSecret =
       process.env.ADMIN_REGISTRATION_SECRET;
 
-    if (!authorizationSecret || authorizationSecret.length < 32) {
+    if (
+      !authorizationSecret ||
+      authorizationSecret.length < 32
+    ) {
       console.error(
         "ADMIN_REGISTRATION_SECRET is missing or too short."
       );
 
       return NextResponse.json(
-        { error: "Admin registration is not configured." },
-        { status: 503 }
+        {
+          error:
+            "Admin registration is not configured.",
+        },
+        {
+          status: 503,
+        }
       );
     }
+
+    /*
+     * ------------------------------------------------------------
+     * Parse request body
+     * ------------------------------------------------------------
+     */
 
     let body: unknown;
 
@@ -49,12 +84,23 @@ export async function POST(request: Request) {
       body = await request.json();
     } catch {
       return NextResponse.json(
-        { error: "Invalid JSON request." },
-        { status: 400 }
+        {
+          error: "Invalid JSON request.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    const parsed = registrationSchema.safeParse(body);
+    /*
+     * ------------------------------------------------------------
+     * Validate request
+     * ------------------------------------------------------------
+     */
+
+    const parsed =
+      registrationSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -62,122 +108,263 @@ export async function POST(request: Request) {
           error:
             "Please provide a valid name, email, authorization key, and password of at least 12 characters.",
         },
-        { status: 400 }
+        {
+          status: 400,
+        }
       );
     }
 
-    const { secret, name, email, password } = parsed.data;
+    const {
+      secret,
+      name,
+      email,
+      password,
+    } = parsed.data;
 
-    if (!secretMatches(secret, authorizationSecret)) {
+    /*
+     * ------------------------------------------------------------
+     * Verify authorization secret
+     * ------------------------------------------------------------
+     */
+
+    if (
+      !secretMatches(
+        secret,
+        authorizationSecret
+      )
+    ) {
       return NextResponse.json(
-        { error: "Invalid authorization key." },
-        { status: 403 }
+        {
+          error:
+            "Invalid authorization key.",
+        },
+        {
+          status: 403,
+        }
       );
     }
 
-    const nameParts = name.split(/\s+/);
+    /*
+     * ------------------------------------------------------------
+     * Split full name
+     * ------------------------------------------------------------
+     */
+
+    const nameParts =
+      name.split(/\s+/);
 
     if (nameParts.length < 2) {
       return NextResponse.json(
-        { error: "Please enter your first and last name." },
-        { status: 400 }
+        {
+          error:
+            "Please enter your first and last name.",
+        },
+        {
+          status: 400,
+        }
       );
     }
 
-    const normalizedEmail = email.toLowerCase();
-    const firstName = nameParts[0];
-    const lastName = nameParts.slice(1).join(" ");
+    const normalizedEmail =
+      email.toLowerCase();
 
-    // Hash before storing; never save a plaintext password.
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const firstName =
+      nameParts[0];
 
-    const admin = await prisma.$transaction(
-      async (tx) => {
-        // This endpoint provisions the first admin only.
-        const existingAdmin = await tx.user.findFirst({
-          where: { role: "ADMIN" },
-          select: { id: true },
-        });
+    const lastName =
+      nameParts
+        .slice(1)
+        .join(" ");
 
-        if (existingAdmin) {
-          throw new Error("ADMIN_ALREADY_EXISTS");
+    /*
+     * ------------------------------------------------------------
+     * Hash password
+     * ------------------------------------------------------------
+     */
+
+    const hashedPassword =
+      await bcrypt.hash(
+        password,
+        12
+      );
+
+    /*
+     * ------------------------------------------------------------
+     * Create the first admin
+     * ------------------------------------------------------------
+     */
+
+    const admin =
+      await prisma.$transaction(
+        async (tx) => {
+          /*
+           * Only allow the first admin
+           * to be created through this endpoint.
+           */
+
+          const existingAdmin =
+            await tx.user.findFirst({
+              where: {
+                role: "ADMIN",
+              },
+              select: {
+                id: true,
+              },
+            });
+
+          if (existingAdmin) {
+            throw new Error(
+              "ADMIN_ALREADY_EXISTS"
+            );
+          }
+
+          /*
+           * Check whether the email
+           * is already registered.
+           */
+
+          const existingUser =
+            await tx.user.findUnique({
+              where: {
+                email: normalizedEmail,
+              },
+              select: {
+                id: true,
+              },
+            });
+
+          if (existingUser) {
+            throw new Error(
+              "EMAIL_ALREADY_EXISTS"
+            );
+          }
+
+          /*
+           * Create admin account.
+           */
+
+          return tx.user.create({
+            data: {
+              name,
+              firstName,
+              lastName,
+              email: normalizedEmail,
+              password: hashedPassword,
+              role: "ADMIN",
+              status: "ACTIVE",
+            },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              role: true,
+              createdAt: true,
+            },
+          });
+        },
+        {
+          isolationLevel:
+            Prisma.TransactionIsolationLevel.Serializable,
         }
+      );
 
-        const existingUser = await tx.user.findUnique({
-          where: { email: normalizedEmail },
-          select: { id: true },
-        });
-
-        if (existingUser) {
-          throw new Error("EMAIL_ALREADY_EXISTS");
-        }
-
-        return tx.user.create({
-          data: {
-            name,
-            firstName,
-            lastName,
-            email: normalizedEmail,
-            password: hashedPassword,
-            role: "ADMIN",
-            status: "ACTIVE",
-          },
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            role: true,
-            createdAt: true,
-          },
-        });
-      },
-      {
-        isolationLevel: Prisma.TransactionIsolationLevel.Serializable,
-      }
-    );
+    /*
+     * ------------------------------------------------------------
+     * Success response
+     * ------------------------------------------------------------
+     */
 
     return NextResponse.json(
       {
-        message: "Admin account created successfully.",
+        message:
+          "Admin account created successfully.",
         admin,
       },
-      { status: 201 }
+      {
+        status: 201,
+      }
     );
   } catch (error) {
+    /*
+     * ------------------------------------------------------------
+     * Known application errors
+     * ------------------------------------------------------------
+     */
+
     if (error instanceof Error) {
-      if (error.message === "ADMIN_ALREADY_EXISTS") {
+      if (
+        error.message ===
+        "ADMIN_ALREADY_EXISTS"
+      ) {
         return NextResponse.json(
           {
             error:
               "An administrator already exists. New admin registration is closed.",
           },
-          { status: 409 }
+          {
+            status: 409,
+          }
         );
       }
 
-      if (error.message === "EMAIL_ALREADY_EXISTS") {
+      if (
+        error.message ===
+        "EMAIL_ALREADY_EXISTS"
+      ) {
         return NextResponse.json(
-          { error: "An account with this email already exists." },
-          { status: 409 }
+          {
+            error:
+              "An account with this email already exists.",
+          },
+          {
+            status: 409,
+          }
         );
       }
     }
+
+    /*
+     * ------------------------------------------------------------
+     * Prisma unique constraint
+     * ------------------------------------------------------------
+     */
 
     if (
-      error instanceof Prisma.PrismaClientKnownRequestError &&
-      error.code === "P2002"
+      error instanceof
+      Prisma.PrismaClientKnownRequestError
     ) {
-      return NextResponse.json(
-        { error: "This account conflicts with an existing record." },
-        { status: 409 }
-      );
+      if (error.code === "P2002") {
+        return NextResponse.json(
+          {
+            error:
+              "This account conflicts with an existing record.",
+          },
+          {
+            status: 409,
+          }
+        );
+      }
     }
 
-    console.error("Admin registration failed:", error);
+    /*
+     * ------------------------------------------------------------
+     * Unexpected error
+     * ------------------------------------------------------------
+     */
+
+    console.error(
+      "Admin registration failed:",
+      error
+    );
 
     return NextResponse.json(
-      { error: "Unable to create the admin account. Please try again." },
-      { status: 500 }
+      {
+        error:
+          "Unable to create the admin account. Please try again.",
+      },
+      {
+        status: 500,
+      }
     );
   }
 }
