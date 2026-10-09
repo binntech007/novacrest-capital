@@ -1,7 +1,9 @@
+
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Geist, Geist_Mono } from "next/font/google";
 
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -42,6 +44,12 @@ export default function RootLayout({
     >
       <body className="min-h-full bg-[#050912] font-sans text-white">
         {children}
+
+        <Script
+          id="tawk-to-chat"
+          strategy="lazyOnload"
+          src="https://embed.tawk.to/6ac8f0ca532d6134c74ad3a7/1k4gep6ei"
+        />
       </body>
     </html>
   );
