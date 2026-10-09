@@ -1,3 +1,4 @@
+
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
@@ -6,15 +7,14 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
 
-export const {
-  handlers,
-  auth,
-  signIn,
-  signOut,
-} = NextAuth({
+export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
 
   adapter: PrismaAdapter(prisma),
+
+  session: {
+    strategy: "jwt",
+  },
 
   providers: [
     Credentials({
@@ -47,28 +47,21 @@ export const {
         }
 
         const user = await prisma.user.findUnique({
-          where: {
-            email,
-          },
+          where: { email },
         });
 
-        if (!user) {
+        if (
+          !user ||
+          user.status !== "ACTIVE" ||
+          !user.password
+        ) {
           return null;
         }
 
-        if (user.status !== "ACTIVE") {
-          return null;
-        }
-
-        if (!user.password) {
-          return null;
-        }
-
-        const passwordMatches =
-          await bcrypt.compare(
-            password,
-            user.password
-          );
+        const passwordMatches = await bcrypt.compare(
+          password,
+          user.password
+        );
 
         if (!passwordMatches) {
           return null;
@@ -78,7 +71,7 @@ export const {
           id: user.id,
           name:
             user.name ??
-            `${user.firstName} ${user.lastName}`,
+            `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
           email: user.email,
           role: user.role,
           status: user.status,
@@ -88,8 +81,6 @@ export const {
   ],
 
   callbacks: {
-    ...authConfig.callbacks,
-
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
@@ -102,21 +93,21 @@ export const {
 
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = String(
-          token.id ??
-            token.sub ??
-            ""
-        );
+        session.user.id = String(token.id ?? token.sub ?? "");
 
-        session.user.role =
-          token.role as
-            | "ADMIN"
-            | "CUSTOMER";
+        if (
+          token.role === "ADMIN" ||
+          token.role === "CUSTOMER"
+        ) {
+          session.user.role = token.role;
+        }
 
-        session.user.status =
-          token.status as
-            | "ACTIVE"
-            | "BLOCKED";
+        if (
+          token.status === "ACTIVE" ||
+          token.status === "BLOCKED"
+        ) {
+          session.user.status = token.status;
+        }
       }
 
       return session;

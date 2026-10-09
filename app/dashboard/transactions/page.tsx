@@ -1,29 +1,20 @@
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-
 import type { LucideIcon } from "lucide-react";
-
 import {
   ArrowDownLeft,
   ArrowDownRight,
   ArrowUpRight,
   Banknote,
-  Bot,
   CalendarDays,
   CheckCircle2,
   Clock3,
   FileText,
   TrendingUp,
   Wallet as WalletIcon,
-  XCircle,
 } from "lucide-react";
-
 import Link from "next/link";
 import { redirect } from "next/navigation";
-
-/* ================================================================
-   TYPES
-================================================================ */
 
 type WalletTransactionType =
   | "CREDIT"
@@ -31,44 +22,14 @@ type WalletTransactionType =
   | "WITHDRAWAL"
   | "INVESTMENT_PROFIT";
 
-type WithdrawalStatus =
-  | "PENDING"
-  | "PROCESSING"
-  | "COMPLETED"
-  | "REJECTED"
-  | "CANCELLED";
-
-type DisplayTransactionType =
-  | WalletTransactionType
-  | "INVESTMENT"
-  | "TRADING_BOT";
-
 type Transaction = {
   id: string;
   amount: number;
-  type: DisplayTransactionType;
-
-  /**
-   * Original wallet transaction type.
-   * Used to determine whether money entered or left
-   * the customer's wallet.
-   */
-  walletType: WalletTransactionType;
-
+  type: WalletTransactionType;
   description: string;
   reference: string;
   createdAt: Date;
-
-  status?: WithdrawalStatus;
-
-  withdrawalMethod?: "BANK" | "CRYPTO";
-
-  withdrawalDestination?: string | null;
 };
-
-/* ================================================================
-   FORMATTERS
-================================================================ */
 
 function formatCurrency(amount: number, currency: string) {
   return new Intl.NumberFormat("en-US", {
@@ -86,221 +47,50 @@ function formatDate(date: Date) {
   }).format(date);
 }
 
-/* ================================================================
-   DISPLAY TYPE
-================================================================ */
-
-function getDisplayType(
-  type: WalletTransactionType,
-  description: string,
-): DisplayTransactionType {
-  const lowerDescription = description.toLowerCase();
-
-  /*
-   * Trading bot transactions are currently recorded
-   * as WITHDRAWAL in the wallet transaction table.
-   */
-  if (
-    lowerDescription.includes("trading bot") ||
-    lowerDescription.includes("bot subscription")
-  ) {
-    return "TRADING_BOT";
-  }
-
-  /*
-   * Investment purchases are currently recorded
-   * as WITHDRAWAL in the wallet transaction table.
-   */
-  if (
-    lowerDescription.includes("investment started") ||
-    lowerDescription.includes("investment plan") ||
-    lowerDescription.includes("investment -")
-  ) {
-    return "INVESTMENT";
-  }
-
-  return type;
-}
-
-/* ================================================================
-   MONEY DIRECTION
-================================================================ */
-
-function isMoneyIn(
-  type: DisplayTransactionType,
-  walletType: WalletTransactionType,
-  status?: WithdrawalStatus,
-) {
-  /*
-   * If a withdrawal is rejected, the money is returned
-   * to the customer's wallet.
-   */
-  if (walletType === "WITHDRAWAL" && status === "REJECTED") {
-    return true;
-  }
-
-  /*
-   * Investment and trading-bot subscriptions are money out.
-   */
-  if (type === "INVESTMENT" || type === "TRADING_BOT") {
-    return false;
-  }
-
+function isMoneyIn(type: WalletTransactionType) {
   return (
-    walletType === "CREDIT" ||
-    walletType === "DEPOSIT" ||
-    walletType === "INVESTMENT_PROFIT"
+    type === "CREDIT" ||
+    type === "DEPOSIT" ||
+    type === "INVESTMENT_PROFIT"
   );
 }
 
-/* ================================================================
-   TYPE LABEL
-================================================================ */
-
-function getTypeLabel(type: DisplayTransactionType) {
+function getTypeLabel(type: WalletTransactionType) {
   switch (type) {
     case "CREDIT":
       return "Credit";
-
     case "DEPOSIT":
       return "Deposit";
-
     case "WITHDRAWAL":
       return "Withdrawal";
-
-    case "INVESTMENT":
-      return "Investment";
-
-    case "TRADING_BOT":
-      return "Trading Bot";
-
     case "INVESTMENT_PROFIT":
       return "Investment Profit";
-
     default:
       return "Transaction";
   }
 }
 
-/* ================================================================
-   TYPE ICON
-================================================================ */
-
-function getTypeIcon(type: DisplayTransactionType): LucideIcon {
+function getTypeIcon(type: WalletTransactionType): LucideIcon {
   switch (type) {
     case "CREDIT":
       return ArrowDownLeft;
-
     case "DEPOSIT":
       return Banknote;
-
     case "WITHDRAWAL":
       return ArrowUpRight;
-
-    case "INVESTMENT":
-      return TrendingUp;
-
-    case "TRADING_BOT":
-      return Bot;
-
     case "INVESTMENT_PROFIT":
       return TrendingUp;
-
     default:
       return FileText;
   }
 }
 
-/* ================================================================
-   WITHDRAWAL STATUS BADGE
-================================================================ */
-
-function WithdrawalStatusBadge({
-  status,
-}: {
-  status: WithdrawalStatus;
-}) {
-  switch (status) {
-    case "PENDING":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-[10px] font-semibold text-amber-400">
-          <Clock3 className="h-3 w-3" />
-          Pending
-        </span>
-      );
-
-    case "PROCESSING":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/20 bg-blue-500/10 px-2.5 py-1 text-[10px] font-semibold text-blue-400">
-          <Clock3 className="h-3 w-3" />
-          Processing
-        </span>
-      );
-
-    case "COMPLETED":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-semibold text-emerald-400">
-          <CheckCircle2 className="h-3 w-3" />
-          Completed
-        </span>
-      );
-
-    case "REJECTED":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-[10px] font-semibold text-red-400">
-          <XCircle className="h-3 w-3" />
-          Rejected
-        </span>
-      );
-
-    case "CANCELLED":
-      return (
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-500/20 bg-slate-500/10 px-2.5 py-1 text-[10px] font-semibold text-slate-400">
-          <XCircle className="h-3 w-3" />
-          Cancelled
-        </span>
-      );
-
-    default:
-      return null;
-  }
-}
-
-/* ================================================================
-   TYPE BADGE
-================================================================ */
-
-function TypeBadge({
-  type,
-  walletType,
-  status,
-}: {
-  type: DisplayTransactionType;
-  walletType: WalletTransactionType;
-  status?: WithdrawalStatus;
-}) {
-  const moneyIn = isMoneyIn(type, walletType, status);
-
-  /*
-   * Withdrawals display their transaction type and
-   * current withdrawal status separately.
-   */
-  if (type === "WITHDRAWAL" && status) {
-    return (
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1 text-[10px] font-semibold text-red-400">
-          <ArrowUpRight className="h-3 w-3" />
-          Withdrawal
-        </span>
-
-        <WithdrawalStatusBadge status={status} />
-      </div>
-    );
-  }
+function TypeBadge({ type }: { type: WalletTransactionType }) {
+  const moneyIn = isMoneyIn(type);
 
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${
         moneyIn
           ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
           : "border-red-500/20 bg-red-500/10 text-red-400"
@@ -311,28 +101,14 @@ function TypeBadge({
       ) : (
         <ArrowUpRight className="h-3 w-3" />
       )}
-
       {getTypeLabel(type)}
     </span>
   );
 }
 
-/* ================================================================
-   TRANSACTION ICON
-================================================================ */
-
-function TransactionIcon({
-  type,
-  walletType,
-  status,
-}: {
-  type: DisplayTransactionType;
-  walletType: WalletTransactionType;
-  status?: WithdrawalStatus;
-}) {
+function TransactionIcon({ type }: { type: WalletTransactionType }) {
   const Icon = getTypeIcon(type);
-
-  const moneyIn = isMoneyIn(type, walletType, status);
+  const moneyIn = isMoneyIn(type);
 
   return (
     <div
@@ -349,92 +125,37 @@ function TransactionIcon({
   );
 }
 
-/* ================================================================
-   WITHDRAWAL MESSAGE
-================================================================ */
-
-function WithdrawalMessage({
-  status,
+function SummaryCard({
+  title,
+  value,
+  description,
+  icon: Icon,
+  iconClassName,
 }: {
-  status: WithdrawalStatus;
+  title: string;
+  value: string;
+  description: string;
+  icon: LucideIcon;
+  iconClassName: string;
 }) {
-  if (status === "PENDING") {
-    return (
-      <div className="mt-4 rounded-xl border border-amber-500/10 bg-amber-500/5 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <Clock3 className="h-3.5 w-3.5 shrink-0 text-amber-400" />
-
-          <p className="text-[10px] leading-4 text-amber-400/90">
-            Your withdrawal is pending admin review.
-          </p>
-        </div>
+  return (
+    <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
+      <div
+        className={`mb-4 flex h-10 w-10 items-center justify-center rounded-xl ${iconClassName}`}
+      >
+        <Icon className="h-5 w-5" />
       </div>
-    );
-  }
 
-  if (status === "PROCESSING") {
-    return (
-      <div className="mt-4 rounded-xl border border-blue-500/10 bg-blue-500/5 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <Clock3 className="h-3.5 w-3.5 shrink-0 text-blue-400" />
+      <p className="text-sm text-slate-400">{title}</p>
 
-          <p className="text-[10px] leading-4 text-blue-400/90">
-            Your withdrawal is currently being processed.
-          </p>
-        </div>
-      </div>
-    );
-  }
+      <p className="mt-1 truncate text-2xl font-bold text-white">
+        {value}
+      </p>
 
-  if (status === "COMPLETED") {
-    return (
-      <div className="mt-4 rounded-xl border border-emerald-500/10 bg-emerald-500/5 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-400" />
-
-          <p className="text-[10px] leading-4 text-emerald-400/90">
-            Your withdrawal has been approved.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "REJECTED") {
-    return (
-      <div className="mt-4 rounded-xl border border-red-500/10 bg-red-500/5 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <XCircle className="h-3.5 w-3.5 shrink-0 text-red-400" />
-
-          <p className="text-[10px] leading-4 text-red-400/90">
-            This withdrawal was rejected and the funds were returned to your
-            wallet.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === "CANCELLED") {
-    return (
-      <div className="mt-4 rounded-xl border border-slate-500/10 bg-slate-500/5 px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          <XCircle className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-
-          <p className="text-[10px] leading-4 text-slate-400">
-            This withdrawal was cancelled.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+      <p className="mt-1 text-xs text-slate-500">{description}</p>
+    </div>
+  );
 }
-
-/* ================================================================
-   TRANSACTION ROW
-================================================================ */
 
 function TransactionRow({
   transaction,
@@ -443,99 +164,13 @@ function TransactionRow({
   transaction: Transaction;
   currency: string;
 }) {
-  const moneyIn = isMoneyIn(
-    transaction.type,
-    transaction.walletType,
-    transaction.status,
-  );
+  const moneyIn = isMoneyIn(transaction.type);
 
   return (
-    <div className="border-b border-white/5 px-4 py-4 transition last:border-b-0 hover:bg-white/2 sm:px-5">
-      {/* ============================================================
-          MOBILE
-      ============================================================ */}
-
-      <div className="block lg:hidden">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
-            <TransactionIcon
-              type={transaction.type}
-              walletType={transaction.walletType}
-              status={transaction.status}
-            />
-
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-white">
-                {transaction.description}
-              </p>
-
-              <p className="mt-1 truncate text-[10px] text-slate-500">
-                Ref: {transaction.reference}
-              </p>
-            </div>
-          </div>
-
-          <p
-            className={`shrink-0 text-sm font-bold ${
-              moneyIn ? "text-emerald-400" : "text-red-400"
-            }`}
-          >
-            {moneyIn ? "+" : "-"}
-            {formatCurrency(transaction.amount, currency)}
-          </p>
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3">
-          {/* Type */}
-
-          <div className="min-w-0">
-            <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-              Type
-            </p>
-
-            <TypeBadge
-              type={transaction.type}
-              walletType={transaction.walletType}
-              status={transaction.status}
-            />
-          </div>
-
-          {/* Date */}
-
-          <div className="min-w-0">
-            <p className="mb-1.5 text-[9px] font-semibold uppercase tracking-wider text-slate-600">
-              Date
-            </p>
-
-            <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
-              <CalendarDays className="h-3 w-3 shrink-0 text-slate-600" />
-
-              <span className="truncate">
-                {formatDate(transaction.createdAt)}
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {transaction.type === "WITHDRAWAL" &&
-          transaction.status && (
-            <WithdrawalMessage status={transaction.status} />
-          )}
-      </div>
-
-      {/* ============================================================
-          DESKTOP
-      ============================================================ */}
-
-      <div className="hidden lg:grid lg:grid-cols-[2fr_1.1fr_1fr_1.2fr] lg:items-center lg:gap-4">
-        {/* Description */}
-
+    <div className="border-b border-white/5 px-5 py-4 transition last:border-b-0 hover:bg-white/[0.02]">
+      <div className="grid gap-4 lg:grid-cols-[2fr_1.1fr_1fr_1.2fr] lg:items-center">
         <div className="flex min-w-0 items-center gap-3">
-          <TransactionIcon
-            type={transaction.type}
-            walletType={transaction.walletType}
-            status={transaction.status}
-          />
+          <TransactionIcon type={transaction.type} />
 
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-white">
@@ -552,13 +187,26 @@ function TransactionRow({
               <span className="text-[11px] text-slate-500">
                 Wallet transaction
               </span>
+
+              <Link
+                href={`/dashboard/transactions/receipt?reference=${encodeURIComponent(
+                  transaction.reference
+                )}`}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/20 bg-blue-500/10 px-2.5 py-1.5 text-[11px] font-semibold text-blue-400 transition hover:bg-blue-500/15 hover:text-blue-300"
+                aria-label={`View receipt for transaction ${transaction.reference}`}
+              >
+                <FileText className="h-3.5 w-3.5" />
+                View Receipt
+              </Link>
             </div>
           </div>
         </div>
 
-        {/* Amount */}
-
         <div>
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-600 lg:hidden">
+            Amount
+          </p>
+
           <p
             className={`text-sm font-bold ${
               moneyIn ? "text-emerald-400" : "text-red-400"
@@ -569,22 +217,21 @@ function TransactionRow({
           </p>
         </div>
 
-        {/* Type */}
-
         <div>
-          <TypeBadge
-            type={transaction.type}
-            walletType={transaction.walletType}
-            status={transaction.status}
-          />
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-600 lg:hidden">
+            Type
+          </p>
+
+          <TypeBadge type={transaction.type} />
         </div>
 
-        {/* Date */}
-
         <div>
+          <p className="mb-1 text-[10px] uppercase tracking-wide text-slate-600 lg:hidden">
+            Date
+          </p>
+
           <div className="flex items-center gap-2 text-xs text-slate-400">
             <CalendarDays className="h-3.5 w-3.5 text-slate-600" />
-
             {formatDate(transaction.createdAt)}
           </div>
         </div>
@@ -592,10 +239,6 @@ function TransactionRow({
     </div>
   );
 }
-
-/* ================================================================
-   EMPTY STATE
-================================================================ */
 
 function EmptyState() {
   return (
@@ -609,8 +252,8 @@ function EmptyState() {
       </h3>
 
       <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-        Your wallet credits, deposits, withdrawals, and investment profits
-        will appear here once they are recorded.
+        Your wallet credits, deposits, withdrawals, and investment
+        profits will appear here once they are recorded.
       </p>
 
       <Link
@@ -623,228 +266,86 @@ function EmptyState() {
   );
 }
 
-/* ================================================================
-   PAGE
-================================================================ */
-
 export default async function TransactionsPage() {
   const session = await auth();
-
-  /* ================================================================
-     AUTHENTICATION
-  ================================================================ */
 
   if (!session?.user?.id) {
     redirect("/login");
   }
 
-  if (session.user.status !== "ACTIVE") {
-    redirect("/login?error=account-unavailable");
-  }
-
-  if (session.user.role !== "CUSTOMER") {
-    redirect("/admin");
-  }
-
-  const userId = session.user.id;
-
-  /* ================================================================
-     LOAD WALLET + WITHDRAWALS
-  ================================================================ */
-
-  const [wallet, withdrawals] = await Promise.all([
-    prisma.wallet.findUnique({
-      where: {
-        userId,
-      },
-
-      select: {
-        balance: true,
-        currency: true,
-
-        transactions: {
-          orderBy: {
-            createdAt: "desc",
-          },
-
-          take: 100,
-
-          select: {
-            id: true,
-            amount: true,
-            type: true,
-            description: true,
-            reference: true,
-            createdAt: true,
-          },
+  const wallet = await prisma.wallet.findUnique({
+    where: {
+      userId: session.user.id,
+    },
+    select: {
+      balance: true,
+      currency: true,
+      transactions: {
+        orderBy: {
+          createdAt: "desc",
+        },
+        take: 100,
+        select: {
+          id: true,
+          amount: true,
+          type: true,
+          description: true,
+          reference: true,
+          createdAt: true,
         },
       },
-    }),
-
-    prisma.withdrawal.findMany({
-      where: {
-        userId,
-      },
-
-      orderBy: {
-        createdAt: "desc",
-      },
-
-      take: 100,
-
-      select: {
-        id: true,
-        amount: true,
-        currency: true,
-        method: true,
-        status: true,
-        bankName: true,
-        accountNumber: true,
-        cryptoNetwork: true,
-        cryptoAddress: true,
-        createdAt: true,
-      },
-    }),
-  ]);
+    },
+  });
 
   const currency = wallet?.currency || "USD";
+  const balance = Number(wallet?.balance ?? 0);
 
-  /* ================================================================
-     NORMAL WALLET TRANSACTIONS
-  ================================================================ */
-
-  const normalTransactions: Transaction[] = (
-    wallet?.transactions ?? []
-  )
-    /*
-     * Withdrawal records created by the withdrawal API
-     * are rebuilt from the Withdrawal table so we can
-     * display their current status.
-     */
-    .filter((transaction) => {
-      if (
-        transaction.type === "WITHDRAWAL" &&
-        transaction.reference.startsWith("WD-")
-      ) {
-        return false;
-      }
-
-      return true;
-    })
-    .map((transaction) => {
-      const walletType =
-        transaction.type as WalletTransactionType;
-
-      const displayType = getDisplayType(
-        walletType,
-        transaction.description,
-      );
-
-      return {
-        id: transaction.id,
-
-        amount: Number(transaction.amount),
-
-        type: displayType,
-
-        walletType,
-
-        description: transaction.description,
-
-        reference: transaction.reference,
-
-        createdAt: transaction.createdAt,
-      };
-    });
-
-  /* ================================================================
-     WITHDRAWAL TRANSACTIONS
-  ================================================================ */
-
-  const withdrawalTransactions: Transaction[] =
-    withdrawals.map((withdrawal) => {
-      let description = "Withdrawal";
-
-      if (withdrawal.method === "BANK") {
-        description = withdrawal.bankName
-          ? `Bank withdrawal - ${withdrawal.bankName}`
-          : "Bank withdrawal";
-      } else {
-        description = withdrawal.cryptoNetwork
-          ? `Crypto withdrawal - ${withdrawal.cryptoNetwork}`
-          : "Crypto withdrawal";
-      }
-
-      return {
-        id: `withdrawal-${withdrawal.id}`,
-
-        amount: Number(withdrawal.amount),
-
-        type: "WITHDRAWAL",
-
-        walletType: "WITHDRAWAL",
-
-        description,
-
-        reference: `WD-${withdrawal.id}`,
-
-        createdAt: withdrawal.createdAt,
-
-        status: withdrawal.status as WithdrawalStatus,
-
-        withdrawalMethod: withdrawal.method,
-
-        withdrawalDestination:
-          withdrawal.method === "BANK"
-            ? withdrawal.accountNumber
-            : withdrawal.cryptoAddress,
-      };
-    });
-
-  /* ================================================================
-     COMBINE + SORT
-  ================================================================ */
-
-  const transactions: Transaction[] = [
-    ...normalTransactions,
-    ...withdrawalTransactions,
-  ].sort(
-    (a, b) =>
-      b.createdAt.getTime() -
-      a.createdAt.getTime(),
+  const transactions: Transaction[] = (wallet?.transactions ?? []).map(
+    (transaction) => ({
+      id: transaction.id,
+      amount: Number(transaction.amount),
+      type: transaction.type as WalletTransactionType,
+      description: transaction.description,
+      reference: transaction.reference,
+      createdAt: transaction.createdAt,
+    }),
   );
 
-  /* ================================================================
-     RENDER
-  ================================================================ */
+  const totalCredits = transactions
+    .filter((transaction) => isMoneyIn(transaction.type))
+    .reduce((total, transaction) => total + transaction.amount, 0);
+
+  const totalWithdrawals = transactions
+    .filter((transaction) => transaction.type === "WITHDRAWAL")
+    .reduce((total, transaction) => total + transaction.amount, 0);
+
+  const totalInvestmentProfit = transactions
+    .filter((transaction) => transaction.type === "INVESTMENT_PROFIT")
+    .reduce((total, transaction) => total + transaction.amount, 0);
 
   return (
-    <main className="min-h-screen bg-[#080d19] px-3 py-5 text-white sm:px-6 sm:py-6 lg:px-8">
+    <main className="min-h-screen bg-[#080d19] px-4 py-6 text-white sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        {/* ============================================================
-            HEADER
-        ============================================================ */}
-
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 sm:h-11 sm:w-11">
-                <ArrowDownRight className="h-5 w-5 text-blue-400 sm:h-6 sm:w-6" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-500/10">
+                <ArrowDownRight className="h-6 w-6 text-blue-400" />
               </div>
 
               <div>
-                <h1 className="text-xl font-bold sm:text-3xl">
+                <h1 className="text-2xl font-bold sm:text-3xl">
                   Transactions
                 </h1>
 
-                <p className="mt-1 text-[11px] text-slate-400 sm:text-sm">
+                <p className="mt-1 text-sm text-slate-400">
                   View and track all activity on your wallet.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="hidden w-fit items-center gap-2 rounded-xl border border-white/10 bg-[#0d1422] px-4 py-3 sm:flex">
+          <div className="flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-[#0d1422] px-4 py-3">
             <CheckCircle2 className="h-4 w-4 text-emerald-400" />
 
             <span className="text-xs text-slate-400">
@@ -853,26 +354,54 @@ export default async function TransactionsPage() {
           </div>
         </div>
 
-        {/* ============================================================
-            TRANSACTION HISTORY
-        ============================================================ */}
+        <section className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <SummaryCard
+            title="Available Balance"
+            value={formatCurrency(balance, currency)}
+            description="Current wallet balance"
+            icon={WalletIcon}
+            iconClassName="bg-blue-500/10 text-blue-400"
+          />
 
-        <section className="mt-5 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422] sm:mt-6">
-          {/* Section header */}
+          <SummaryCard
+            title="Total Credits"
+            value={formatCurrency(totalCredits, currency)}
+            description="Credits, deposits and profits"
+            icon={ArrowDownRight}
+            iconClassName="bg-emerald-500/10 text-emerald-400"
+          />
 
-          <div className="flex items-center justify-between gap-3 border-b border-white/10 px-4 py-4 sm:p-5">
-            <div className="min-w-0">
-              <h2 className="text-base font-semibold text-white sm:text-lg">
+          <SummaryCard
+            title="Total Withdrawals"
+            value={formatCurrency(totalWithdrawals, currency)}
+            description="Recorded withdrawals"
+            icon={ArrowUpRight}
+            iconClassName="bg-red-500/10 text-red-400"
+          />
+
+          <SummaryCard
+            title="Investment Profit"
+            value={formatCurrency(totalInvestmentProfit, currency)}
+            description="Recorded investment profits"
+            icon={TrendingUp}
+            iconClassName="bg-purple-500/10 text-purple-400"
+          />
+        </section>
+
+        <section className="mt-6 overflow-hidden rounded-2xl border border-white/10 bg-[#0d1422]">
+          <div className="flex flex-col gap-4 border-b border-white/10 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-white">
                 Transaction History
               </h2>
 
-              <p className="mt-1 truncate text-[10px] text-slate-500 sm:text-xs">
+              <p className="mt-1 text-xs text-slate-500">
                 Your latest wallet transactions are shown below.
               </p>
             </div>
 
-            <div className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1.5 text-[10px] text-slate-400 sm:gap-2 sm:rounded-xl sm:px-3 sm:py-2 sm:text-xs">
-              <FileText className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
+            <div className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-slate-400">
+              <FileText className="h-3.5 w-3.5" />
 
               {transactions.length} transaction
               {transactions.length === 1 ? "" : "s"}
@@ -883,16 +412,12 @@ export default async function TransactionsPage() {
             <EmptyState />
           ) : (
             <>
-              {/* Desktop header */}
-
               <div className="hidden grid-cols-[2fr_1.1fr_1fr_1.2fr] gap-4 border-b border-white/10 px-5 py-3 text-[10px] font-semibold uppercase tracking-wider text-slate-600 lg:grid">
                 <span>Description</span>
                 <span>Amount</span>
-                <span>Type / Status</span>
+                <span>Type</span>
                 <span>Date</span>
               </div>
-
-              {/* Transactions */}
 
               <div>
                 {transactions.map((transaction) => (
@@ -907,15 +432,11 @@ export default async function TransactionsPage() {
           )}
         </section>
 
-        {/* ============================================================
-            INFORMATION
-        ============================================================ */}
-
-        <section className="mt-5 grid gap-4 sm:mt-6 md:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
+        <section className="mt-6 grid gap-4 md:grid-cols-2">
+          <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
             <div className="flex gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-500/10 sm:h-10 sm:w-10">
-                <WalletIcon className="h-4 w-4 text-blue-400 sm:h-5 sm:w-5" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-500/10">
+                <WalletIcon className="h-5 w-5 text-blue-400" />
               </div>
 
               <div>
@@ -923,19 +444,18 @@ export default async function TransactionsPage() {
                   Wallet Balance
                 </h3>
 
-                <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs">
-                  Your available balance is read directly from your Wallet
-                  record. Pending withdrawals are already deducted from the
-                  available balance while awaiting review.
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Your available balance is read directly from your
+                  Wallet record.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-4 sm:p-5">
+          <div className="rounded-2xl border border-white/10 bg-[#0d1422] p-5">
             <div className="flex gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-500/10 sm:h-10 sm:w-10">
-                <TrendingUp className="h-4 w-4 text-purple-400 sm:h-5 sm:w-5" />
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-purple-500/10">
+                <TrendingUp className="h-5 w-5 text-purple-400" />
               </div>
 
               <div>
@@ -943,9 +463,10 @@ export default async function TransactionsPage() {
                   Investment Profits
                 </h3>
 
-                <p className="mt-1 text-[11px] leading-5 text-slate-500 sm:text-xs">
-                  Investment profit transactions are displayed as credits in
-                  your wallet transaction history.
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Investment profit transactions are displayed as
+                  credits and included in the Investment Profit
+                  summary.
                 </p>
               </div>
             </div>

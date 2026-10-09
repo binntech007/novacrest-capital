@@ -1,4 +1,3 @@
-
 import type { NextAuthConfig } from "next-auth";
 
 export const authConfig = {
@@ -25,33 +24,26 @@ export const authConfig = {
 
     session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role =
-          token.role as "ADMIN" | "CUSTOMER";
-        session.user.status =
-          token.status as "ACTIVE" | "BLOCKED";
+        session.user.id = String(
+          token.id ?? token.sub ?? ""
+        );
+
+        if (
+          token.role === "ADMIN" ||
+          token.role === "CUSTOMER"
+        ) {
+          session.user.role = token.role;
+        }
+
+        if (
+          token.status === "ACTIVE" ||
+          token.status === "BLOCKED"
+        ) {
+          session.user.status = token.status;
+        }
       }
 
       return session;
-    },
-
-    authorized({ auth, request }) {
-      const pathname = request.nextUrl.pathname;
-      const user = auth?.user;
-
-      if (pathname.startsWith("/admin")) {
-        return !!user &&
-          user.role === "ADMIN" &&
-          user.status === "ACTIVE";
-      }
-
-      if (pathname.startsWith("/dashboard")) {
-        return !!user &&
-          user.role === "CUSTOMER" &&
-          user.status === "ACTIVE";
-      }
-
-      return true;
     },
   },
 } satisfies NextAuthConfig;

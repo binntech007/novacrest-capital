@@ -13,6 +13,29 @@ export default async function AdminPage() {
     redirect("/admin/login");
   }
 
+  if (session.user.role !== "ADMIN") {
+    redirect("/dashboard");
+  }
+
+  const admin = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      firstName: true,
+      lastName: true,
+      email: true,
+      role: true,
+      status: true,
+    },
+  });
+
+  if (!admin || admin.role !== "ADMIN") {
+    redirect("/admin/login");
+  }
+
+  if (admin.status !== "ACTIVE") {
+    redirect("/admin/login?error=account-unavailable");
+  }
+
   const [customerCount, adminCount, activeUserCount] =
     await Promise.all([
       prisma.user.count({
@@ -25,19 +48,6 @@ export default async function AdminPage() {
         where: { status: "ACTIVE" },
       }),
     ]);
-
-  const admin = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: {
-      firstName: true,
-      lastName: true,
-      email: true,
-    },
-  });
-
-  if (!admin) {
-    redirect("/admin/login");
-  }
 
   const name =
     `${admin.firstName ?? ""} ${admin.lastName ?? ""}`.trim() ||

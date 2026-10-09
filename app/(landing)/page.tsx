@@ -1,9 +1,11 @@
+
 import { HeroSection } from "@/components/landing/HeroSection";
 import { MarketPreview } from "@/components/landing/MarketPreview";
 import { MarketsSection } from "@/components/landing/MarketsSection";
 import { ServicesSection } from "@/components/landing/ServicesSection";
 import { HowItWorks } from "@/components/landing/HowItWorks";
 import { SecuritySection } from "@/components/landing/SecuritySection";
+import TeamSection from "@/components/landing/TeamSection";
 import { CertificateSection } from "@/components/landing/CertificateSection";
 import { FAQSection } from "@/components/landing/FAQSection";
 import { FinalCTA } from "@/components/landing/FinalCTA";
@@ -28,6 +30,9 @@ export default function HomePage() {
 
       {/* Security & Control */}
       <SecuritySection />
+
+      {/* Our Team */}
+      <TeamSection />
 
       {/* Corporate Certificate */}
       <CertificateSection />
