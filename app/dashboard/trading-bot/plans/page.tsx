@@ -36,7 +36,7 @@ const plans = [
     name: "AI Bronze",
     amount: 1000,
     roi: "15%",
-    duration: 7,
+    duration: 14,
     icon: Trophy,
     description:
       "A higher allocation tier for customers who want a larger bot allocation.",
@@ -47,7 +47,7 @@ const plans = [
     name: "AI Silver",
     amount: 2500,
     roi: "18%",
-    duration: 7,
+    duration: 21,
     icon: Sparkles,
     description:
       "An intermediate trading bot subscription tier.",
@@ -58,7 +58,7 @@ const plans = [
     name: "AI Gold",
     amount: 5000,
     roi: "22%",
-    duration: 7,
+    duration: 28,
     icon: Star,
     description:
       "A higher-value trading bot subscription tier.",
@@ -69,7 +69,7 @@ const plans = [
     name: "AI Platinum",
     amount: 10000,
     roi: "27%",
-    duration: 7,
+    duration: 35,
     icon: Gem,
     description:
       "A premium trading bot subscription tier.",
@@ -80,7 +80,7 @@ const plans = [
     name: "AI Diamond",
     amount: 25000,
     roi: "33%",
-    duration: 7,
+    duration: 42,
     icon: Gem,
     description:
       "An advanced trading bot subscription tier.",
@@ -91,7 +91,7 @@ const plans = [
     name: "AI Quantum VIP",
     amount: 50000,
     roi: "40%",
-    duration: 7,
+    duration: 50,
     icon: Trophy,
     description:
       "The highest configured trading bot subscription tier.",
