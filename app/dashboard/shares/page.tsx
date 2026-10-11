@@ -831,7 +831,7 @@ function GCashShareCalculator() {
           </div>
           <div className="rounded-xl border border-emerald-400/20 bg-emerald-500/10 px-4 py-3">
             <p className="text-xs text-slate-400">Stated return rate</p>
-            <p className="mt-1 text-xl font-bold text-emerald-400">7.5% / 8 days</p>
+            <p className="mt-1 text-xl font-bold text-emerald-400"> 8 days</p>
           </div>
         </div>
       </div>

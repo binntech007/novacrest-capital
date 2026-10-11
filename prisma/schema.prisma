@@ -50,6 +50,12 @@ enum WithdrawalMethod {
   CRYPTO
 }
 
+enum DepositRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum WithdrawalStatus {
   PENDING
   PROCESSING
@@ -68,7 +74,6 @@ enum TransferStatus {
   FAILED
 }
 
-
 model User {
   id            String     @id @default(cuid())
   name          String?
@@ -83,21 +88,22 @@ model User {
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt
 
-
-  accounts           Account[]
-  sessions           Session[]
-  investments Investment[]
-  withdrawals Withdrawal[]
+  accounts                Account[]
+  sessions                Session[]
+  investments             Investment[]
+  withdrawals             Withdrawal[]
   tradingBotSubscriptions TradingBotSubscription[]
-  wallet             Wallet?
-  customerAllocation CustomerAllocation?
-  sentTransfers InternalTransfer[] @relation("TransferSender")
-  receivedTransfers InternalTransfer[] @relation("TransferRecipient")
+  depositRequests DepositRequest[]
+  wallet                  Wallet?
+  customerAllocation      CustomerAllocation?
+  sentTransfers           InternalTransfer[]       @relation("TransferSender")
+  receivedTransfers       InternalTransfer[]       @relation("TransferRecipient")
 
   adminWalletCredits WalletTransaction[] @relation("WalletTransactionAdmin")
 
-  kycApplication KycApplication?
-  kycReviews     KycApplication[] @relation("KycReviewer")
+  kycApplication  KycApplication?
+  kycReviews      KycApplication[] @relation("KycReviewer")
+  
 
   @@index([role])
   @@index([status])
@@ -180,7 +186,6 @@ model WalletTransaction {
   @@index([adminId])
 }
 
-
 model TradingBotSubscription {
   id        String                       @id @default(cuid())
   userId    String
@@ -256,20 +261,18 @@ model CustomerAllocation {
   @@index([userId])
 }
 
-
-
 model Investment {
-  id          String           @id @default(cuid())
-  userId      String
-  planId      String
-  planName    String
-  amount      Decimal          @db.Decimal(20, 2)
-  duration    Int
-  dailyRate   String
-  roi         String
-  status      InvestmentStatus @default(ACTIVE)
-  startedAt   DateTime         @default(now())
-  endsAt      DateTime
+  id        String           @id @default(cuid())
+  userId    String
+  planId    String
+  planName  String
+  amount    Decimal          @db.Decimal(20, 2)
+  duration  Int
+  dailyRate String
+  roi       String
+  status    InvestmentStatus @default(ACTIVE)
+  startedAt DateTime         @default(now())
+  endsAt    DateTime
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -279,13 +282,13 @@ model Investment {
 }
 
 model CryptoDepositAddress {
-  id           String   @id @default(cuid())
+  id           String  @id @default(cuid())
   name         String?
   network      String
   address      String
   qrCodeUrl    String?
   instructions String?
-  enabled      Boolean  @default(true)
+  enabled      Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -295,16 +298,16 @@ model CryptoDepositAddress {
 }
 
 model BankPaymentSettings {
-  id                  String   @id @default(cuid())
-  enabled             Boolean  @default(true)
+  id      String  @id @default(cuid())
+  enabled Boolean @default(true)
 
-  bankName            String
-  bankAccountName     String
-  bankAccountNumber   String
+  bankName          String
+  bankAccountName   String
+  bankAccountNumber String
 
-  bankRoutingNumber   String?
-  bankSwiftCode       String?
-  bankIban            String?
+  bankRoutingNumber String?
+  bankSwiftCode     String?
+  bankIban          String?
 
   depositInstructions String?
 
@@ -313,31 +316,31 @@ model BankPaymentSettings {
 }
 
 model Withdrawal {
-  id            String            @id @default(cuid())
-  userId        String
-  amount        Decimal           @db.Decimal(20, 2)
-  currency      String            @default("USD")
-  method        WithdrawalMethod
-  status        WithdrawalStatus  @default(PENDING)
+  id       String           @id @default(cuid())
+  userId   String
+  amount   Decimal          @db.Decimal(20, 2)
+  currency String           @default("USD")
+  method   WithdrawalMethod
+  status   WithdrawalStatus @default(PENDING)
 
   // Bank details
-  bankName           String?
-  accountName        String?
-  accountNumber      String?
-  routingNumber      String?
-  swiftCode          String?
-  iban               String?
+  bankName      String?
+  accountName   String?
+  accountNumber String?
+  routingNumber String?
+  swiftCode     String?
+  iban          String?
 
   // Crypto details
-  cryptoNetwork      String?
-  cryptoAddress      String?
+  cryptoNetwork String?
+  cryptoAddress String?
 
-  note              String?
-  rejectionReason   String?
+  note            String?
+  rejectionReason String?
 
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  processedAt       DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  processedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -367,4 +370,34 @@ model InternalTransfer {
   @@index([recipientId, createdAt])
   @@index([type])
   @@index([status])
+}
+
+model DepositRequest {
+  id        String @id @default(cuid())
+  reference String @unique @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  amount   Decimal @db.Decimal(18, 2)
+  currency String  @default("USD")
+
+  cryptoName     String
+  network        String
+  depositAddress String
+
+  receiptUrl      String
+  receiptPublicId String?
+
+  status       DepositRequestStatus @default(PENDING)
+  adminNote    String?
+  reviewedById String?
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
 }
