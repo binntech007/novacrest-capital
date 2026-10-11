@@ -26,14 +26,6 @@ const teamMembers = [
     image:
       "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=700&q=85",
   },
-  {
-    name: "Charlotte Wilson",
-    role: "Head of Client Relations",
-    description:
-      "Focuses on client communication, service, and relationship management.",
-    image:
-      "https://images.unsplash.com/photo-1580489944761-15a19d654956?auto=format&fit=crop&w=700&q=85",
-  },
 ];
 
 export default function TeamSection() {
