@@ -1584,7 +1584,7 @@ const shares: Share[] = [
 
   {
     symbol: "GCASH",
-    name: "G-Cash Shares",
+    name: "GCash Shares",
     price: 6.6,
     change: 0,
     category: "Featured",
@@ -1690,7 +1690,7 @@ function GCashShareCalculator() {
 
             <p className="text-xs text-slate-400">Stated return rate</p>
 
-            <p className="mt-1 text-xl font-bold text-emerald-400"> 8 days</p>
+            <p className="mt-1 text-xl font-bold text-emerald-400"> 3.5%/8 days</p>
 
           </div>
 

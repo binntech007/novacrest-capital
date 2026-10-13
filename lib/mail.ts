@@ -9,6 +9,7 @@ const smtpPort = Number(
 
 const smtpUser = process.env.ZOHO_SMTP_USER;
 
+
 const smtpPassword =
   process.env.ZOHO_SMTP_PASSWORD;
 
