@@ -1680,7 +1680,7 @@ function GCashShareCalculator() {
 
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-400">Featured Share</p>
 
-            <h2 className="mt-2 text-2xl font-bold text-white">G-Cash Shares</h2>
+            <h2 className="mt-2 text-2xl font-bold text-white">GCash Shares</h2>
 
             <p className="mt-2 text-sm text-slate-400">Reference share price: ₱6.60 PHP</p>
 
@@ -1744,7 +1744,7 @@ function GCashShareCalculator() {
 
             <div className="border-t border-white/10 pt-3">
 
-              <div className="flex justify-between gap-3 text-sm"><span className="text-slate-400">Illustrative 7.5% amount</span><span className="font-semibold text-emerald-400">{validAmount ? formatPHP(estimatedReturn) : "—"}</span></div>
+              <div className="flex justify-between gap-3 text-sm"><span className="text-slate-400">Illustrative 3.5% amount</span><span className="font-semibold text-emerald-400">{validAmount ? formatPHP(estimatedReturn) : "—"}</span></div>
 
               <p className="mt-2 text-xs leading-5 text-slate-500">Illustration only, not a guaranteed return. Actual results can differ and may be affected by fees, taxes, market prices, and share terms.</p>
 
